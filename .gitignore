@@ -1,0 +1,6 @@
+# User-specific configuration
+*.backup.*
+.DS_Store
+
+# Test files
+test-output.txt
