@@ -20,6 +20,39 @@ CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 100
 # Format cost to 2 decimal places (fix floating point precision)
 COST=$(printf "%.2f" "$COST" 2>/dev/null || echo "0.00")
 
+# === INPUT/OUTPUT COST BREAKDOWN ===
+# Determine pricing based on model (prices per million tokens)
+MODEL_ID=$(echo "$input" | jq -r '.model.id // ""')
+INPUT_PRICE=3    # Default: Sonnet 4.5
+OUTPUT_PRICE=15
+
+case "$MODEL_ID" in
+    *opus-4*)
+        INPUT_PRICE=5
+        OUTPUT_PRICE=25
+        ;;
+    *sonnet-4*)
+        INPUT_PRICE=3
+        OUTPUT_PRICE=15
+        ;;
+    *haiku-4*)
+        INPUT_PRICE=1
+        OUTPUT_PRICE=5
+        ;;
+    *haiku-3.5*)
+        INPUT_PRICE=0.8
+        OUTPUT_PRICE=4
+        ;;
+    *haiku-3*)
+        INPUT_PRICE=0.25
+        OUTPUT_PRICE=1.25
+        ;;
+esac
+
+# Calculate input/output costs
+INPUT_COST=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT / 1000000.0 * $INPUT_PRICE)}")
+OUTPUT_COST=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_OUTPUT / 1000000.0 * $OUTPUT_PRICE)}")
+
 # Extract session slug
 SESSION_SLUG=""
 if [ -f "$TRANSCRIPT_PATH" ]; then
@@ -298,7 +331,7 @@ fi
 # === HACKER ELITE: 3-Line Clear Layout ===
 LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m │ ${ACCOUNT_TYPE}"
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GIT_STATUS}${SIZE_LABEL}"
-LINE3="⚡️ ${PROGRESS_BAR} │ ${SESSION_INFO} │ 💰 \$${COST} │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
+LINE3="⚡️ ${PROGRESS_BAR} │ ${SESSION_INFO} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
 echo -e "$LINE1"
 echo -e "$LINE2"
