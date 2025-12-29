@@ -300,11 +300,23 @@ if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
         REPO_URL="https://github.com/${REPO_PATH}"
         TARGET_BRANCH=${UPSTREAM_BRANCH:-$BRANCH}
 
+        # Allow per-repo GitHub auth by pointing GH CLI at a custom config dir
+        # Priority: git config statusline.ghConfigDir > STATUSLINE_GH_CONFIG_DIR env var
+        GH_CONFIG_DIR_OVERRIDE="${STATUSLINE_GH_CONFIG_DIR:-}"
+        GH_CONFIG_FROM_GIT=$(git -C "$DIR" config --get statusline.ghConfigDir 2>/dev/null)
+        if [ -n "$GH_CONFIG_FROM_GIT" ]; then
+            GH_CONFIG_DIR_OVERRIDE="$GH_CONFIG_FROM_GIT"
+        fi
+
         if [ -n "$TARGET_BRANCH" ]; then
             PR_URL=""
             # If GitHub CLI is available, try to fetch PR URL for the branch
             if command -v gh >/dev/null 2>&1; then
-                PR_URL=$(gh pr view "$TARGET_BRANCH" --repo "$REPO_PATH" --json url 2>/dev/null | jq -r '.url // empty')
+                if [ -n "$GH_CONFIG_DIR_OVERRIDE" ]; then
+                    PR_URL=$(env GH_CONFIG_DIR="$GH_CONFIG_DIR_OVERRIDE" gh pr view "$TARGET_BRANCH" --repo "$REPO_PATH" --json url 2>/dev/null | jq -r '.url // empty')
+                else
+                    PR_URL=$(gh pr view "$TARGET_BRANCH" --repo "$REPO_PATH" --json url 2>/dev/null | jq -r '.url // empty')
+                fi
             fi
 
             BRANCH_URL="${REPO_URL}/tree/${TARGET_BRANCH}"
