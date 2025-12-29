@@ -263,6 +263,7 @@ BRANCH=""
 SIZE_LABEL=""
 GIT_STATUS=""
 GIT_DETAILS=""
+GITHUB_LINK=""
 
 # Only process git info if we're in a git repository
 if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
@@ -273,6 +274,43 @@ if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
     # Show "detached@" followed by short commit hash
     if [ -z "$BRANCH" ]; then
         BRANCH="detached@$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null)"
+    fi
+
+    # Determine upstream branch and repository URL (GitHub only)
+    UPSTREAM_REF=$(git -C "$DIR" rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null)
+    UPSTREAM_REMOTE="${UPSTREAM_REF%%/*}"
+    UPSTREAM_BRANCH="${UPSTREAM_REF#*/}"
+    REMOTE_NAME=${UPSTREAM_REMOTE:-origin}
+    REMOTE_URL=$(git -C "$DIR" config --get "remote.${REMOTE_NAME}.url" 2>/dev/null)
+
+    # Normalize GitHub remote URLs to https://github.com/owner/repo form
+    REPO_PATH=""
+    if [[ "$REMOTE_URL" =~ ^git@github.com:(.*)\.git$ ]]; then
+        REPO_PATH="${BASH_REMATCH[1]}"
+    elif [[ "$REMOTE_URL" =~ ^git@github.com:(.*)$ ]]; then
+        REPO_PATH="${BASH_REMATCH[1]}"
+    elif [[ "$REMOTE_URL" =~ ^https?://github.com/(.*)\.git$ ]]; then
+        REPO_PATH="${BASH_REMATCH[1]}"
+    elif [[ "$REMOTE_URL" =~ ^https?://github.com/(.*)$ ]]; then
+        REPO_PATH="${BASH_REMATCH[1]}"
+    fi
+
+    # Build GitHub branch/PR link if possible
+    if [ -n "$REPO_PATH" ]; then
+        REPO_URL="https://github.com/${REPO_PATH}"
+        TARGET_BRANCH=${UPSTREAM_BRANCH:-$BRANCH}
+
+        if [ -n "$TARGET_BRANCH" ]; then
+            PR_URL=""
+            # If GitHub CLI is available, try to fetch PR URL for the branch
+            if command -v gh >/dev/null 2>&1; then
+                PR_URL=$(gh pr view "$TARGET_BRANCH" --repo "$REPO_PATH" --json url 2>/dev/null | jq -r '.url // empty')
+            fi
+
+            BRANCH_URL="${REPO_URL}/tree/${TARGET_BRANCH}"
+            LINK_URL="${PR_URL:-$BRANCH_URL}"
+            GITHUB_LINK=" (${LINK_URL})"
+        fi
     fi
 
     # Detect the default branch by checking symbolic-ref first,
@@ -517,7 +555,7 @@ fi
 # Line 3: Session metrics (context, costs, time)
 
 LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m │ ${ACCOUNT_TYPE}"
-LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GIT_STATUS}${SIZE_LABEL}"
+LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
 LINE3="⚡️ ${PROGRESS_BAR} │ ${SESSION_INFO} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
 echo -e "$LINE1"
