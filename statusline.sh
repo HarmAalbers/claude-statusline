@@ -285,13 +285,13 @@ if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
 
     # Normalize GitHub remote URLs to https://github.com/owner/repo form
     REPO_PATH=""
-    if [[ "$REMOTE_URL" =~ ^git@github.com:(.*)\.git$ ]]; then
+    if [[ "$REMOTE_URL" =~ ^git@github\.com[^:]*:(.*)\.git$ ]]; then
         REPO_PATH="${BASH_REMATCH[1]}"
-    elif [[ "$REMOTE_URL" =~ ^git@github.com:(.*)$ ]]; then
+    elif [[ "$REMOTE_URL" =~ ^git@github\.com[^:]*:(.*)$ ]]; then
         REPO_PATH="${BASH_REMATCH[1]}"
-    elif [[ "$REMOTE_URL" =~ ^https?://github.com/(.*)\.git$ ]]; then
+    elif [[ "$REMOTE_URL" =~ ^https?://github\.com/(.*)\.git$ ]]; then
         REPO_PATH="${BASH_REMATCH[1]}"
-    elif [[ "$REMOTE_URL" =~ ^https?://github.com/(.*)$ ]]; then
+    elif [[ "$REMOTE_URL" =~ ^https?://github\.com/(.*)$ ]]; then
         REPO_PATH="${BASH_REMATCH[1]}"
     fi
 
