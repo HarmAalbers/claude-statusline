@@ -100,6 +100,22 @@ The statusline script uses standard bash and supports customization:
 | ↑Push:N | Commits to push | Blue |
 | ↓Pull:N | Commits to pull | Blue |
 
+### Using different GitHub accounts per project
+
+If you collaborate with multiple GitHub accounts, point the statusline's `gh` calls
+at a custom config directory. Each project can keep its own `gh` credentials:
+
+```bash
+# set once per repo
+git config statusline.ghConfigDir ~/.config/gh-work
+
+# or use an environment override for ad-hoc runs
+STATUSLINE_GH_CONFIG_DIR=~/.config/gh-personal bash ~/.claude/statusline-command.sh
+```
+
+The git config value takes precedence over the environment variable. Both options
+are compatible with the GitHub CLI's multiple-config support.
+
 ## PR Size Labels
 
 Based on lines changed from default branch:
