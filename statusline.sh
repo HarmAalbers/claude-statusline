@@ -321,7 +321,19 @@ if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
 
             BRANCH_URL="${REPO_URL}/tree/${TARGET_BRANCH}"
             LINK_URL="${PR_URL:-$BRANCH_URL}"
-            GITHUB_LINK=" (${LINK_URL})"
+
+            # Create short clickable link text with ANSI hyperlink
+            if [ -n "$PR_URL" ]; then
+                # Extract PR number from URL (last segment after /)
+                PR_NUMBER="${PR_URL##*/}"
+                LINK_TEXT="PR #${PR_NUMBER}"
+            else
+                LINK_TEXT="GitHub"
+            fi
+
+            # ANSI hyperlink format: ESC]8;;URL BEL TEXT ESC]8;; BEL
+            # Using \e for ESC and \a for BEL (most compatible with echo -e)
+            GITHUB_LINK=" [\e]8;;${LINK_URL}\a${LINK_TEXT}\e]8;;\a]"
         fi
     fi
 
