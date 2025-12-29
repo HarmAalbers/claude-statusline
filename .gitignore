@@ -1,6 +1,7 @@
 # User-specific configuration
 *.backup.*
 .DS_Store
+ruff.toml
 
 # Test files
 test-output.txt
