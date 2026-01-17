@@ -97,7 +97,7 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         USED_PCT_INPUT REMAINING_PCT_INPUT \
         CACHE_READ_TOKENS CACHE_CREATE_TOKENS \
         LINES_ADDED LINES_REMOVED \
-        TOTAL_DURATION_MS API_DURATION_MS < <(
+        TOTAL_DURATION_MS API_DURATION_MS CC_VERSION < <(
     echo "$input" | jq -r '[
         .workspace.current_dir,
         (.cost.total_cost_usd // "0"),
@@ -115,7 +115,8 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         (.cost.total_lines_added // 0),
         (.cost.total_lines_removed // 0),
         (.cost.total_duration_ms // 0),
-        (.cost.total_api_duration_ms // 0)
+        (.cost.total_api_duration_ms // 0),
+        (.version // "__EMPTY__")
     ] | @tsv' 2>/dev/null
 )
 
@@ -124,6 +125,7 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
 [ "$MODEL_ID" = "__EMPTY__" ] && MODEL_ID=""
 [ "$USED_PCT_INPUT" = "__EMPTY__" ] && USED_PCT_INPUT=""
 [ "$REMAINING_PCT_INPUT" = "__EMPTY__" ] && REMAINING_PCT_INPUT=""
+[ "$CC_VERSION" = "__EMPTY__" ] && CC_VERSION=""
 
 # Validate and sanitize extracted values
 DIR=$(validate_directory "$DIR")
@@ -208,6 +210,28 @@ if [ "$TOTAL_CACHE_TOKENS" -gt 0 ]; then
         CACHE_COLOR="\033[0;90m"  # Dim - low cache reuse
     fi
     CACHE_EFFICIENCY="${CACHE_COLOR}⚡${CACHE_PCT}%\033[0m"
+fi
+
+# ============================================================================
+# API LATENCY INDICATOR
+# ============================================================================
+
+# Calculate API latency as percentage of total time (higher = more waiting for API)
+# This helps identify if slowdowns are network/API vs local processing
+API_LATENCY=""
+if [ "$TOTAL_DURATION_MS" -gt 0 ] && [ "$API_DURATION_MS" -gt 0 ]; then
+    LATENCY_PCT=$((API_DURATION_MS * 100 / TOTAL_DURATION_MS))
+    # Format API time in seconds with one decimal
+    API_SECS=$(awk "BEGIN {printf \"%.1f\", $API_DURATION_MS / 1000.0}")
+    # Color based on API dominance: green (<50% API), yellow (50-80%), red (>80%)
+    if [ "$LATENCY_PCT" -lt 50 ]; then
+        LATENCY_COLOR="\033[1;32m"  # Green - mostly local processing
+    elif [ "$LATENCY_PCT" -lt 80 ]; then
+        LATENCY_COLOR="\033[1;33m"  # Yellow - moderate API waiting
+    else
+        LATENCY_COLOR="\033[0;90m"  # Dim - mostly waiting for API
+    fi
+    API_LATENCY="${LATENCY_COLOR}📡${API_SECS}s\033[0m"
 fi
 
 # ============================================================================
@@ -687,14 +711,25 @@ if [ -n "$CACHE_EFFICIENCY" ]; then
     CACHE_DISPLAY=" ${CACHE_EFFICIENCY}"
 fi
 
+API_DISPLAY=""
+if [ -n "$API_LATENCY" ]; then
+    API_DISPLAY=" ${API_LATENCY}"
+fi
+
 LINES_DISPLAY=""
 if [ -n "$LINES_CHANGED" ]; then
     LINES_DISPLAY=" │ 📝 ${LINES_CHANGED}"
 fi
 
-LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m │ ${ACCOUNT_TYPE}"
+# Format version for display (e.g., "1.0.80" -> "v1.0.80")
+VERSION_DISPLAY=""
+if [ -n "$CC_VERSION" ]; then
+    VERSION_DISPLAY=" \033[0;90mv${CC_VERSION}\033[0m"
+fi
+
+LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}"
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
-LINE3="⚡️ ${PROGRESS_BAR}${CACHE_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
+LINE3="⚡️ ${PROGRESS_BAR}${CACHE_DISPLAY}${API_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
 echo -e "$LINE1"
 echo -e "$LINE2"

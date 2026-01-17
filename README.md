@@ -9,12 +9,22 @@ A beautiful, information-rich statusline for Claude Code with context window tra
   - 🟢 Green (0-49%): Safe
   - 🟡 Yellow (50-79%): Warning
   - 🔴 Red (80%+): Critical
+- **Cache Efficiency Indicator** - Shows prompt cache hit rate (⚡️XX%)
+  - 🟢 Green (>60%): Excellent cache reuse
+  - 🟡 Yellow (30-60%): Moderate reuse
+  - ⚪ Dim (<30%): Low cache utilization
+- **API Latency Display** - Shows API response time (📡X.Xs)
+  - Helps identify network vs processing bottlenecks
+- **Code Churn Metrics** - Lines added/removed in session (📝 +N/-M)
+  - See the impact of your changes at a glance
+- **Claude Code Version** - Shows the CLI version (vX.X.X)
 - **Enhanced Git Status** - Clear, labeled indicators instead of cryptic symbols
   - Conflicts, staged, modified, untracked files
   - Push/pull indicators
   - PR size labels (XS, S, M, L, XL, XXL)
 - **Session Tracking** - Session ID and human-readable slug
 - **Cost Monitoring** - Session cost, daily total, hourly burn rate
+  - Input/output cost breakdown (↓input/↑output)
 - **Account Type Display** - Shows Pro/Max/Team/API
 - **Smart Environment Detection** - Python, Node.js, Go versions
 - **Session Duration** - Per-session time tracking
@@ -22,10 +32,15 @@ A beautiful, information-rich statusline for Claude Code with context window tra
 ### 🎨 Display Layout
 
 ```
-Line 1: 📁 Directory 🐍Python │ [Model] │ Max
-Line 2: 🌿 branch-name ✓Staged:2 ●Modified:5 ?Untracked:1 ↑Push:3 M
-Line 3: ⚡️ ▓▓▓░░░░░░░ 35% │ 📋 session │ 💰 $2.50 │ 📊 $15.20/day │ 🔥 $12.50/hr │ ⏱️ 12m │ 🕐 14:23
+Line 1: 📁 Directory 🐍Python │ [Model] v1.0.80 │ Max
+Line 2: 🌿 branch-name [PR #42] ✓Staged:2 ●Modified:5 ?Untracked:1 ↑Push:3 M
+Line 3: ⚡️ ▓▓▓░░░░░░░ 35% ⚡75% 📡2.3s │ 📋 session │ 📝 +156/-23 │ 💰 $2.50 (↓$0.12/↑$1.23) │ 📊 $15.20/day │ 🔥 $12.50/hr │ ⏱️ 12m │ 🕐 14:23
 ```
+
+**Layout breakdown:**
+- **Line 1**: Directory, language/env, model with version, account type
+- **Line 2**: Git branch, GitHub PR link, file status, push/pull counts, PR size
+- **Line 3**: Context bar, cache efficiency, API latency, session info, code churn, costs, time
 
 ## Installation
 
@@ -116,6 +131,26 @@ STATUSLINE_GH_CONFIG_DIR=~/.config/gh-personal bash ~/.claude/statusline-command
 The git config value takes precedence over the environment variable. Both options
 are compatible with the GitHub CLI's multiple-config support.
 
+## Performance Indicators
+
+### Cache Efficiency (⚡️XX%)
+
+Shows the ratio of cache reads to cache writes. Higher percentages mean Claude is reusing cached context effectively, reducing costs.
+
+| Range | Color | Meaning |
+|-------|-------|---------|
+| >60% | Green | Excellent - High cache reuse |
+| 30-60% | Yellow | Moderate - Some cache utilization |
+| <30% | Dim | Low - Mostly new context |
+
+### API Latency (📡X.Xs)
+
+Shows the total API response time during the session. Helps identify if slowdowns are due to network/API latency or local processing.
+
+### Code Churn (📝 +N/-M)
+
+Shows lines added and removed during this session, with the net change in parentheses. Useful for tracking the impact of your changes.
+
 ## PR Size Labels
 
 Based on lines changed from default branch:
@@ -145,7 +180,7 @@ chmod +x ~/.claude/statusline-command.sh
 
 2. Test the script manually:
 ```bash
-echo '{"model":{"display_name":"Test"},"workspace":{"current_dir":"/test"},"cost":{"total_cost_usd":"0"},"context_window":{"total_input_tokens":0,"total_output_tokens":0,"context_window_size":1000000}}' | bash ~/.claude/statusline-command.sh
+echo '{"version":"1.0.80","model":{"display_name":"Test","id":"claude-sonnet-4"},"workspace":{"current_dir":"/test"},"cost":{"total_cost_usd":"1.25","total_lines_added":50,"total_lines_removed":10,"total_duration_ms":30000,"total_api_duration_ms":15000},"context_window":{"total_input_tokens":5000,"total_output_tokens":1000,"context_window_size":200000,"used_percentage":35,"current_usage":{"cache_read_input_tokens":3000,"cache_creation_input_tokens":1000}}}' | bash ~/.claude/statusline-command.sh
 ```
 
 ### Numbers not formatting correctly
