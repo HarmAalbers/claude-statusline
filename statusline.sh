@@ -88,13 +88,16 @@ if ! echo "$input" | jq empty 2>/dev/null; then
 fi
 
 # Extract all data in a single jq call for performance
-# This reduces 9 separate process spawns to just 1
+# This reduces many separate process spawns to just 1
 # Set IFS to tab-only to correctly parse tab-separated values with spaces
 # Note: We use "__EMPTY__" placeholder for empty fields because bash read
 # collapses consecutive tab delimiters, which would shift all fields
 IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         TOTAL_INPUT TOTAL_OUTPUT CONTEXT_SIZE MODEL_ID \
-        USED_PCT_INPUT REMAINING_PCT_INPUT < <(
+        USED_PCT_INPUT REMAINING_PCT_INPUT \
+        CACHE_READ_TOKENS CACHE_CREATE_TOKENS \
+        LINES_ADDED LINES_REMOVED \
+        TOTAL_DURATION_MS API_DURATION_MS < <(
     echo "$input" | jq -r '[
         .workspace.current_dir,
         (.cost.total_cost_usd // "0"),
@@ -106,7 +109,13 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         (.context_window.context_window_size // 1000000),
         (.model.id // "__EMPTY__"),
         (.context_window.used_percentage // "__EMPTY__"),
-        (.context_window.remaining_percentage // "__EMPTY__")
+        (.context_window.remaining_percentage // "__EMPTY__"),
+        (.context_window.current_usage.cache_read_input_tokens // 0),
+        (.context_window.current_usage.cache_creation_input_tokens // 0),
+        (.cost.total_lines_added // 0),
+        (.cost.total_lines_removed // 0),
+        (.cost.total_duration_ms // 0),
+        (.cost.total_api_duration_ms // 0)
     ] | @tsv' 2>/dev/null
 )
 
@@ -123,6 +132,12 @@ SESSION_ID="${SESSION_ID:0:8}"  # Truncate to first 8 chars
 TOTAL_INPUT=$(validate_integer "$TOTAL_INPUT" "0")
 TOTAL_OUTPUT=$(validate_integer "$TOTAL_OUTPUT" "0")
 CONTEXT_SIZE=$(validate_integer "$CONTEXT_SIZE" "1000000")
+CACHE_READ_TOKENS=$(validate_integer "$CACHE_READ_TOKENS" "0")
+CACHE_CREATE_TOKENS=$(validate_integer "$CACHE_CREATE_TOKENS" "0")
+LINES_ADDED=$(validate_integer "$LINES_ADDED" "0")
+LINES_REMOVED=$(validate_integer "$LINES_REMOVED" "0")
+TOTAL_DURATION_MS=$(validate_integer "$TOTAL_DURATION_MS" "0")
+API_DURATION_MS=$(validate_integer "$API_DURATION_MS" "0")
 
 # Prevent division by zero in context calculations
 if [ "$CONTEXT_SIZE" -eq 0 ]; then
@@ -173,6 +188,44 @@ esac
 # Using validated numeric inputs to prevent injection
 INPUT_COST=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT / 1000000.0 * $INPUT_PRICE)}")
 OUTPUT_COST=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_OUTPUT / 1000000.0 * $OUTPUT_PRICE)}")
+
+# ============================================================================
+# CACHE EFFICIENCY
+# ============================================================================
+
+# Calculate cache efficiency ratio (higher = more cache hits = lower cost)
+# Cache read tokens are ~90% cheaper than regular input tokens
+CACHE_EFFICIENCY=""
+TOTAL_CACHE_TOKENS=$((CACHE_READ_TOKENS + CACHE_CREATE_TOKENS))
+if [ "$TOTAL_CACHE_TOKENS" -gt 0 ]; then
+    CACHE_PCT=$((CACHE_READ_TOKENS * 100 / TOTAL_CACHE_TOKENS))
+    # Color based on efficiency: green (>60%), yellow (30-60%), dim (<30%)
+    if [ "$CACHE_PCT" -ge 60 ]; then
+        CACHE_COLOR="\033[1;32m"  # Green - excellent cache reuse
+    elif [ "$CACHE_PCT" -ge 30 ]; then
+        CACHE_COLOR="\033[1;33m"  # Yellow - moderate
+    else
+        CACHE_COLOR="\033[0;90m"  # Dim - low cache reuse
+    fi
+    CACHE_EFFICIENCY="${CACHE_COLOR}⚡${CACHE_PCT}%\033[0m"
+fi
+
+# ============================================================================
+# LINES CHANGED METRICS
+# ============================================================================
+
+# Calculate net lines changed (positive = growth, negative = refactoring)
+LINES_CHANGED=""
+if [ "$LINES_ADDED" -gt 0 ] || [ "$LINES_REMOVED" -gt 0 ]; then
+    NET_LINES=$((LINES_ADDED - LINES_REMOVED))
+    # Format with sign
+    if [ "$NET_LINES" -ge 0 ]; then
+        NET_DISPLAY="+${NET_LINES}"
+    else
+        NET_DISPLAY="${NET_LINES}"
+    fi
+    LINES_CHANGED="\033[1;32m+${LINES_ADDED}\033[0m/\033[1;31m-${LINES_REMOVED}\033[0m (${NET_DISPLAY})"
+fi
 
 # ============================================================================
 # SESSION INFORMATION
@@ -626,11 +679,22 @@ fi
 # 3-Line layout for clarity and information density
 # Line 1: Directory context (location, language, model, account)
 # Line 2: Git status (branch, changes, PR size)
-# Line 3: Session metrics (context, costs, time)
+# Line 3: Session metrics (context, cache, code changes, costs, time)
+
+# Build conditional metrics for LINE3
+CACHE_DISPLAY=""
+if [ -n "$CACHE_EFFICIENCY" ]; then
+    CACHE_DISPLAY=" ${CACHE_EFFICIENCY}"
+fi
+
+LINES_DISPLAY=""
+if [ -n "$LINES_CHANGED" ]; then
+    LINES_DISPLAY=" │ 📝 ${LINES_CHANGED}"
+fi
 
 LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m │ ${ACCOUNT_TYPE}"
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
-LINE3="⚡️ ${PROGRESS_BAR} │ ${SESSION_INFO} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
+LINE3="⚡️ ${PROGRESS_BAR}${CACHE_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
 echo -e "$LINE1"
 echo -e "$LINE2"
