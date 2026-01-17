@@ -50,6 +50,24 @@ validate_directory() {
     fi
 }
 
+# Validate that a value is a percentage (0-100, integer or float)
+# Returns empty string if invalid (caller should fall back to calculated value)
+validate_percentage() {
+    local val="$1"
+    # Check if it's a valid number
+    if [[ "$val" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        # Convert to integer for range check
+        local int_val=$(awk "BEGIN {printf \"%.0f\", $val}")
+        if [ "$int_val" -ge 0 ] && [ "$int_val" -le 100 ]; then
+            echo "$val"
+        else
+            echo ""
+        fi
+    else
+        echo ""
+    fi
+}
+
 # ============================================================================
 # INPUT EXTRACTION AND VALIDATION
 # ============================================================================
@@ -72,20 +90,31 @@ fi
 # Extract all data in a single jq call for performance
 # This reduces 9 separate process spawns to just 1
 # Set IFS to tab-only to correctly parse tab-separated values with spaces
+# Note: We use "__EMPTY__" placeholder for empty fields because bash read
+# collapses consecutive tab delimiters, which would shift all fields
 IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
-        TOTAL_INPUT TOTAL_OUTPUT CONTEXT_SIZE MODEL_ID < <(
+        TOTAL_INPUT TOTAL_OUTPUT CONTEXT_SIZE MODEL_ID \
+        USED_PCT_INPUT REMAINING_PCT_INPUT < <(
     echo "$input" | jq -r '[
         .workspace.current_dir,
         (.cost.total_cost_usd // "0"),
         (.model.display_name // "Claude"),
         (.session_id // "unknown"),
-        (.transcript_path // ""),
+        (.transcript_path // "__EMPTY__"),
         (.context_window.total_input_tokens // 0),
         (.context_window.total_output_tokens // 0),
         (.context_window.context_window_size // 1000000),
-        (.model.id // "")
+        (.model.id // "__EMPTY__"),
+        (.context_window.used_percentage // "__EMPTY__"),
+        (.context_window.remaining_percentage // "__EMPTY__")
     ] | @tsv' 2>/dev/null
 )
+
+# Convert __EMPTY__ placeholders back to empty strings
+[ "$TRANSCRIPT_PATH" = "__EMPTY__" ] && TRANSCRIPT_PATH=""
+[ "$MODEL_ID" = "__EMPTY__" ] && MODEL_ID=""
+[ "$USED_PCT_INPUT" = "__EMPTY__" ] && USED_PCT_INPUT=""
+[ "$REMAINING_PCT_INPUT" = "__EMPTY__" ] && REMAINING_PCT_INPUT=""
 
 # Validate and sanitize extracted values
 DIR=$(validate_directory "$DIR")
@@ -528,14 +557,35 @@ fi
 # CONTEXT WINDOW PROGRESS BAR
 # ============================================================================
 
-# Calculate context usage percentage
-TOTAL_TOKENS=$((TOTAL_INPUT + TOTAL_OUTPUT))
-CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", ($TOTAL_TOKENS * 100 / $CONTEXT_SIZE)}")
+# Validate pre-calculated percentages from Claude Code (if provided)
+USED_PCT_VALIDATED=$(validate_percentage "$USED_PCT_INPUT")
+REMAINING_PCT_VALIDATED=$(validate_percentage "$REMAINING_PCT_INPUT")
+
+# Use pre-calculated used_percentage if available, otherwise calculate from tokens
+if [ -n "$USED_PCT_VALIDATED" ]; then
+    # Use the pre-calculated percentage (convert to integer for display)
+    CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", $USED_PCT_VALIDATED}")
+else
+    # Fall back to calculating from token counts
+    TOTAL_TOKENS=$((TOTAL_INPUT + TOTAL_OUTPUT))
+    CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", ($TOTAL_TOKENS * 100 / $CONTEXT_SIZE)}")
+fi
+
+# Calculate remaining percentage if not provided
+if [ -n "$REMAINING_PCT_VALIDATED" ]; then
+    REMAINING_PCT=$(awk "BEGIN {printf \"%.0f\", $REMAINING_PCT_VALIDATED}")
+else
+    REMAINING_PCT=$((100 - CONTEXT_PCT))
+fi
 
 # Validate percentage is in valid range
 CONTEXT_PCT=$(validate_integer "$CONTEXT_PCT" "0")
 if [ "$CONTEXT_PCT" -gt 100 ]; then
     CONTEXT_PCT=100
+fi
+REMAINING_PCT=$(validate_integer "$REMAINING_PCT" "0")
+if [ "$REMAINING_PCT" -lt 0 ]; then
+    REMAINING_PCT=0
 fi
 
 # Build 10-character progress bar showing token usage percentage
