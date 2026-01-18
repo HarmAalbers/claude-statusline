@@ -68,6 +68,12 @@ validate_percentage() {
     fi
 }
 
+# Encode text for use in custom URL scheme (base64)
+# Used for click-to-copy functionality in terminal hyperlinks
+encode_for_url() {
+    echo -n "$1" | base64 | tr -d '\n'
+}
+
 # ============================================================================
 # INPUT EXTRACTION AND VALIDATION
 # ============================================================================
@@ -130,7 +136,8 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
 # Validate and sanitize extracted values
 DIR=$(validate_directory "$DIR")
 COST=$(validate_number "$COST" "0")
-SESSION_ID="${SESSION_ID:0:8}"  # Truncate to first 8 chars
+FULL_SESSION_ID="$SESSION_ID"  # Preserve full UUID for click-to-copy
+SESSION_ID="${SESSION_ID:0:8}"  # Truncate to first 8 chars for display
 TOTAL_INPUT=$(validate_integer "$TOTAL_INPUT" "0")
 TOTAL_OUTPUT=$(validate_integer "$TOTAL_OUTPUT" "0")
 CONTEXT_SIZE=$(validate_integer "$CONTEXT_SIZE" "1000000")
@@ -690,10 +697,33 @@ for ((i=0; i<EMPTY; i++)); do
 done
 PROGRESS_BAR="${PROGRESS_BAR}\033[0m ${CONTEXT_PCT}%"
 
-# Build session info (ID + optional human-readable slug)
-SESSION_INFO="📋 ${SESSION_ID}"
-if [ -n "$SESSION_SLUG" ]; then
-    SESSION_INFO="${SESSION_INFO} (${SESSION_SLUG})"
+# Build session info with clickable links (click-to-copy)
+# Session ID: clicking copies the full UUID to clipboard
+# Session slug: clicking copies the full transcript path to clipboard
+# Uses OSC 8 ANSI hyperlinks with custom claude-copy:// URL scheme
+
+# Define escape sequences using $'...' syntax for reliable interpretation
+# This creates actual escape characters, not literal \e strings
+OSC8_START=$'\e]8;;'
+OSC8_END=$'\e]8;;\a'
+BEL=$'\a'
+
+# Encode full session ID for click-to-copy URL
+SESSION_ID_ENCODED=$(encode_for_url "$FULL_SESSION_ID")
+SESSION_ID_LINK="${OSC8_START}claude-copy://session/${SESSION_ID_ENCODED}${BEL}${SESSION_ID}${OSC8_END}"
+
+# Build session info with clickable session ID
+if [ -n "$SESSION_SLUG" ] && [ -n "$TRANSCRIPT_PATH" ]; then
+    # Both slug and path available: make slug clickable to copy path
+    TRANSCRIPT_ENCODED=$(encode_for_url "$TRANSCRIPT_PATH")
+    SESSION_SLUG_LINK="${OSC8_START}claude-copy://path/${TRANSCRIPT_ENCODED}${BEL}${SESSION_SLUG}${OSC8_END}"
+    SESSION_INFO="📋 ${SESSION_ID_LINK} (${SESSION_SLUG_LINK})"
+elif [ -n "$SESSION_SLUG" ]; then
+    # Slug available but no path: slug not clickable
+    SESSION_INFO="📋 ${SESSION_ID_LINK} (${SESSION_SLUG})"
+else
+    # Just session ID
+    SESSION_INFO="📋 ${SESSION_ID_LINK}"
 fi
 
 # ============================================================================

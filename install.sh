@@ -89,6 +89,47 @@ fi
 echo "✓ Statusline script installed to ${TARGET_SCRIPT}"
 
 # ============================================================================
+# CLICK-TO-COPY URL HANDLER INSTALLATION
+# ============================================================================
+
+# Install the click-to-copy URL handler (macOS only)
+# This enables clicking on session ID and transcript path in the statusline
+URL_HANDLER_SOURCE="${SCRIPT_DIR}/claude-copy.app"
+URL_HANDLER_TARGET="${HOME}/Applications/claude-copy.app"
+
+if [ -d "$URL_HANDLER_SOURCE" ]; then
+    echo ""
+    echo "Installing click-to-copy URL handler..."
+
+    # Create ~/Applications if it doesn't exist
+    if ! mkdir -p "${HOME}/Applications" 2>/dev/null; then
+        echo "⚠️  Warning: Could not create ~/Applications directory" >&2
+    else
+        # Remove existing handler to ensure clean update
+        if [ -d "$URL_HANDLER_TARGET" ]; then
+            rm -rf "$URL_HANDLER_TARGET" 2>/dev/null
+        fi
+
+        # Copy the app bundle
+        if cp -R "$URL_HANDLER_SOURCE" "$URL_HANDLER_TARGET" 2>/dev/null; then
+            # Open the app once to register the URL scheme with macOS
+            # The app runs in background mode so it will exit immediately
+            open "$URL_HANDLER_TARGET" 2>/dev/null
+            echo "✓ Click-to-copy URL handler installed"
+            echo "  Clicking session ID copies full UUID to clipboard"
+            echo "  Clicking session slug copies transcript path to clipboard"
+        else
+            echo "⚠️  Warning: Could not install URL handler" >&2
+        fi
+    fi
+else
+    echo ""
+    echo "⚠️  URL handler app not found. To enable click-to-copy:"
+    echo "   1. Run: ./build-handler.sh"
+    echo "   2. Re-run: ./install.sh"
+fi
+
+# ============================================================================
 # ACCOUNT TYPE CONFIGURATION
 # ============================================================================
 
@@ -243,6 +284,7 @@ echo "Features:"
 echo "  • Context window progress bar with color warnings"
 echo "  • Enhanced git status (conflicts, staged, modified, untracked)"
 echo "  • Session tracking (ID + human-readable name)"
+echo "  • Click-to-copy: click session ID for UUID, click slug for transcript path"
 echo "  • Cost monitoring (session, daily, hourly rate)"
 echo "  • Input/output cost breakdown"
 echo "  • Smart environment detection (Python, Node.js, Go)"
