@@ -740,6 +740,6 @@ LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHO
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
 LINE3="⚡️ ${PROGRESS_BAR}${CACHE_DISPLAY}${API_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
-echo -e "$LINE1"
-echo -e "$LINE2"
-echo -e "$LINE3"
+printf '%b\n' "$LINE1"
+printf '%b\n' "$LINE2"
+printf '%b\n' "$LINE3"
