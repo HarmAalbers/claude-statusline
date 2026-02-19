@@ -57,7 +57,8 @@ validate_percentage() {
     # Check if it's a valid number
     if [[ "$val" =~ ^[0-9]+\.?[0-9]*$ ]]; then
         # Convert to integer for range check
-        local int_val=$(awk "BEGIN {printf \"%.0f\", $val}")
+        local int_val
+        int_val=$(awk "BEGIN {printf \"%.0f\", $val}")
         if [ "$int_val" -ge 0 ] && [ "$int_val" -le 100 ]; then
             echo "$val"
         else
@@ -106,7 +107,7 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         (.transcript_path // "__EMPTY__"),
         (.context_window.total_input_tokens // 0),
         (.context_window.total_output_tokens // 0),
-        (.context_window.context_window_size // 1000000),
+        (.context_window.context_window_size // 200000),
         (.model.id // "__EMPTY__"),
         (.context_window.used_percentage // "__EMPTY__"),
         (.context_window.remaining_percentage // "__EMPTY__"),
@@ -133,7 +134,7 @@ COST=$(validate_number "$COST" "0")
 SESSION_ID="${SESSION_ID:0:8}"  # Truncate to first 8 chars for display
 TOTAL_INPUT=$(validate_integer "$TOTAL_INPUT" "0")
 TOTAL_OUTPUT=$(validate_integer "$TOTAL_OUTPUT" "0")
-CONTEXT_SIZE=$(validate_integer "$CONTEXT_SIZE" "1000000")
+CONTEXT_SIZE=$(validate_integer "$CONTEXT_SIZE" "200000")
 CACHE_READ_TOKENS=$(validate_integer "$CACHE_READ_TOKENS" "0")
 CACHE_CREATE_TOKENS=$(validate_integer "$CACHE_CREATE_TOKENS" "0")
 LINES_ADDED=$(validate_integer "$LINES_ADDED" "0")
@@ -143,7 +144,7 @@ API_DURATION_MS=$(validate_integer "$API_DURATION_MS" "0")
 
 # Prevent division by zero in context calculations
 if [ "$CONTEXT_SIZE" -eq 0 ]; then
-    CONTEXT_SIZE=1000000
+    CONTEXT_SIZE=200000
 fi
 
 # Format cost to 2 decimal places with validation
@@ -159,12 +160,18 @@ fi
 # ============================================================================
 
 # Calculate separate input/output costs based on model pricing
-# API pricing per million tokens (as of 2025)
-INPUT_PRICE=3    # Default: Sonnet 4.5
+# API pricing per million tokens (as of 2026)
+INPUT_PRICE=3    # Default: Sonnet 4.x
 OUTPUT_PRICE=15
 
 case "$MODEL_ID" in
+    *opus-4-1*|*opus-4-20*)
+        # Opus 4.0 (claude-opus-4-20250514) and Opus 4.1
+        INPUT_PRICE=15
+        OUTPUT_PRICE=75
+        ;;
     *opus-4*)
+        # Opus 4.5, 4.6 (matches after specific 4.0/4.1 patterns above)
         INPUT_PRICE=5
         OUTPUT_PRICE=25
         ;;
@@ -643,9 +650,9 @@ if [ -n "$USED_PCT_VALIDATED" ]; then
     # Use the pre-calculated percentage (convert to integer for display)
     CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", $USED_PCT_VALIDATED}")
 else
-    # Fall back to calculating from token counts
-    TOTAL_TOKENS=$((TOTAL_INPUT + TOTAL_OUTPUT))
-    CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", ($TOTAL_TOKENS * 100 / $CONTEXT_SIZE)}")
+    # Fall back to calculating from input token counts only
+    # (used_percentage is defined as input tokens only per official docs)
+    CONTEXT_PCT=$(awk "BEGIN {printf \"%.0f\", ($TOTAL_INPUT * 100 / $CONTEXT_SIZE)}")
 fi
 
 # Calculate remaining percentage if not provided
