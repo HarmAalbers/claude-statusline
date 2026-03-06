@@ -162,13 +162,8 @@ if [ "$CONTEXT_SIZE" -eq 0 ]; then
     CONTEXT_SIZE=200000
 fi
 
-# Format cost to 2 decimal places with validation
-if ! [[ "$COST" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-    echo "Warning: Invalid cost value from API: '$COST', defaulting to 0.00" >&2
-    COST="0.00"
-else
-    COST=$(printf "%.2f" "$COST")
-fi
+# Format cost to 2 decimal places (already validated by validate_number above)
+COST=$(printf "%.2f" "$COST")
 
 # ============================================================================
 # INPUT/OUTPUT COST BREAKDOWN
@@ -536,13 +531,13 @@ if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
     GIT_STATUS="${GIT_DETAILS}"
 
     # Ahead/behind indicators (commits to push/pull)
-    AHEAD=$(git -C "$DIR" rev-list --count @{upstream}..HEAD 2>/dev/null)
-    if [ -n "$AHEAD" ] && [ "$AHEAD" -gt 0 ] 2>/dev/null; then
+    AHEAD=$(validate_integer "$(git -C "$DIR" rev-list --count @{upstream}..HEAD 2>/dev/null)" "0")
+    if [ "$AHEAD" -gt 0 ]; then
         GIT_STATUS="${GIT_STATUS} \033[1;94m↑Push:${AHEAD}\033[0m"
     fi
 
-    BEHIND=$(git -C "$DIR" rev-list --count HEAD..@{upstream} 2>/dev/null)
-    if [ -n "$BEHIND" ] && [ "$BEHIND" -gt 0 ] 2>/dev/null; then
+    BEHIND=$(validate_integer "$(git -C "$DIR" rev-list --count HEAD..@{upstream} 2>/dev/null)" "0")
+    if [ "$BEHIND" -gt 0 ]; then
         GIT_STATUS="${GIT_STATUS} \033[1;94m↓Pull:${BEHIND}\033[0m"
     fi
 
@@ -577,8 +572,11 @@ fi
 # Display directory relative to home
 DIR_DISPLAY="${DIR/#$HOME/~}"
 
-# Shorten model name for compact display
-MODEL_SHORT=$(echo "$MODEL" | sed -e 's/Claude //' -e 's/ Sonnet//' -e 's/Opus /O/' -e 's/Haiku /H/')
+# Shorten model name for compact display (using parameter expansion instead of sed)
+MODEL_SHORT="${MODEL/Claude /}"
+MODEL_SHORT="${MODEL_SHORT/ Sonnet/}"
+MODEL_SHORT="${MODEL_SHORT/Opus /O}"
+MODEL_SHORT="${MODEL_SHORT/Haiku /H}"
 
 # Thinking indicator
 THINKING_INDICATOR=""
@@ -647,8 +645,10 @@ fi
 VENV_INFO=""
 if [[ -n "$VIRTUAL_ENV" ]]; then
     VENV_NAME=$(basename "$VIRTUAL_ENV")
-    # Match .venv before venv to avoid partial matches
-    VENV_NAME=$(echo "$VENV_NAME" | sed -e 's/\.venv/v/' -e 's/virtualenv/v/' -e 's/venv/v/')
+    # Match .venv before venv to avoid partial matches (using parameter expansion)
+    VENV_NAME="${VENV_NAME/.venv/v}"
+    VENV_NAME="${VENV_NAME/virtualenv/v}"
+    VENV_NAME="${VENV_NAME/venv/v}"
     VENV_INFO=" (${VENV_NAME})"
 fi
 
