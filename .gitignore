@@ -3,5 +3,10 @@
 .DS_Store
 ruff.toml
 
+# IDE and tool config
+.idea/
+.serena/
+claude-copy.app/
+
 # Test files
 test-output.txt
