@@ -35,6 +35,14 @@ This document describes the complete JSON schema that Claude Code sends to the s
     "name": "my-agent"
   },
 
+  "worktree": {
+    "name": "feature-x",
+    "path": "/path/to/worktrees/feature-x",
+    "branch": "worktree-feature-x",
+    "original_cwd": "/path/to/original/project",
+    "original_branch": "main"
+  },
+
   "cost": {
     "total_cost_usd": 0.01234,
     "total_duration_ms": 45000,
@@ -107,6 +115,18 @@ This document describes the complete JSON schema that Claude Code sends to the s
 | `agent.name` | string | Agent name when using `--agent` flag         |
 
 > **Note**: The `agent` object is only present when running with a custom agent.
+
+### Worktree
+
+| Field               | Type   | Description                                                    |
+|---------------------|--------|----------------------------------------------------------------|
+| `worktree.name`     | string | Name of the active git worktree                                |
+| `worktree.path`     | string | Filesystem path to the worktree                                |
+| `worktree.branch`   | string | Branch checked out in the worktree                             |
+| `worktree.original_cwd` | string | Original working directory before entering worktree        |
+| `worktree.original_branch` | string | Branch that was active before entering worktree         |
+
+> **Note**: The `worktree` object is only present when Claude Code is running inside a git worktree (via `/worktree` or `EnterWorktree` tool). Available since Claude Code v2.1.69+.
 
 ### Cost Tracking
 
@@ -186,22 +206,25 @@ The following fields have been requested but are not yet available:
 
 ## Usage in statusline.sh
 
-This project extracts the following fields for display:
+This project extracts 25 fields for display:
 
 ```bash
 # Core fields
 .workspace.current_dir
+.workspace.project_dir              # Navigation indicator
 .cost.total_cost_usd
 .model.display_name
 .model.id
 .session_id
 .transcript_path
+.version
 
 # Context window (prefer pre-calculated percentages)
 .context_window.used_percentage        # Use this!
 .context_window.remaining_percentage   # Use this!
 .context_window.context_window_size
 .context_window.total_input_tokens     # Fallback only (input-only calc)
+.context_window.total_output_tokens
 
 # Cache efficiency
 .context_window.current_usage.cache_read_input_tokens
@@ -214,6 +237,18 @@ This project extracts the following fields for display:
 # Duration metrics
 .cost.total_duration_ms
 .cost.total_api_duration_ms
+
+# Long-context pricing
+.exceeds_200k_tokens                   # Triggers 2x input / 1.5x output pricing
+
+# UI state
+.vim.mode                              # Vim mode indicator (NORMAL/INSERT)
+.output_style.name                     # Output style (default/explanatory/concise)
+.agent.name                            # Active agent name
+
+# Worktree
+.worktree.name                         # Active worktree name
+.worktree.branch                       # Worktree branch
 ```
 
 ## Version History

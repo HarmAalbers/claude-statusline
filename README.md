@@ -17,6 +17,13 @@ A beautiful, information-rich statusline for Claude Code with context window tra
   - Helps identify network vs processing bottlenecks
 - **Code Churn Metrics** - Lines added/removed in session (📝 +N/-M)
   - See the impact of your changes at a glance
+- **Long-Context Pricing** - Accurate cost when exceeds 200K tokens (2x input, 1.5x output)
+  - Context size label (e.g., "1M") shown in red when long-context pricing is active
+- **Vim Mode Indicator** - Shows `[N]` (blue) for NORMAL, `[I]` (green) for INSERT
+- **Output Style Display** - Shows current style when non-default (e.g., `(explanatory)`)
+- **Agent Name Display** - Shows active agent with robot emoji when using `--agent`
+- **Worktree Indicator** - Shows active git worktree name on the git status line
+- **Navigation Indicator** - Shows `(from ~/project)` when current dir diverges from project root
 - **Claude Code Version** - Shows the CLI version (vX.X.X)
 - **Enhanced Git Status** - Clear, labeled indicators instead of cryptic symbols
   - Conflicts, staged, modified, untracked files
@@ -32,15 +39,15 @@ A beautiful, information-rich statusline for Claude Code with context window tra
 ### 🎨 Display Layout
 
 ```
-Line 1: 📁 Directory 🐍Python │ [Model] v1.0.80 │ Max
-Line 2: 🌿 branch-name [PR #42] ✓Staged:2 ●Modified:5 ?Untracked:1 ↑Push:3 M
-Line 3: ⚡️ ▓▓▓░░░░░░░ 35% ⚡75% 📡2.3s │ 📋 session │ 📝 +156/-23 │ 💰 $2.50 (↓$0.12/↑$1.23) │ 📊 $15.20/day │ 🔥 $12.50/hr │ ⏱️ 12m │ 🕐 14:23
+Line 1: 📁 ~/project (from ~/root) 🐍Python │ [Model]🧠[N] 🤖agent v2.1.69 │ Max (explanatory)
+Line 2: 🌳worktree 🌿 branch-name [PR #42] ✓Staged:2 ●Modified:5 ?Untracked:1 ↑Push:3 M
+Line 3: ⚡️ ▓▓▓░░░░░░░ 35% 1M ⚡75% 📡2.3s │ 📋 session │ 📝 +156/-23 │ 💰 $2.50 (↓$0.12/↑$1.23) │ 📊 $15.20/day │ 🔥 $12.50/hr │ ⏱️ 12m │ 🕐 14:23
 ```
 
 **Layout breakdown:**
-- **Line 1**: Directory, language/env, model with version, account type
-- **Line 2**: Git branch, GitHub PR link, file status, push/pull counts, PR size
-- **Line 3**: Context bar, cache efficiency, API latency, session info, code churn, costs, time
+- **Line 1**: Directory, nav indicator, language/env, model, thinking, vim mode, agent, version, account type, output style
+- **Line 2**: Worktree, git branch, GitHub PR link, file status, push/pull counts, PR size
+- **Line 3**: Context bar, context size label, cache efficiency, API latency, session info, code churn, costs, time
 
 ## Installation
 
