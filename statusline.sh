@@ -93,12 +93,15 @@ fi
 # Set IFS to tab-only to correctly parse tab-separated values with spaces
 # Note: We use "__EMPTY__" placeholder for empty fields because bash read
 # collapses consecutive tab delimiters, which would shift all fields
+# IMPORTANT: 25 fields extracted below. The read variable list and jq array must stay in sync.
 IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         TOTAL_INPUT TOTAL_OUTPUT CONTEXT_SIZE MODEL_ID \
         USED_PCT_INPUT REMAINING_PCT_INPUT \
         CACHE_READ_TOKENS CACHE_CREATE_TOKENS \
         LINES_ADDED LINES_REMOVED \
-        TOTAL_DURATION_MS API_DURATION_MS CC_VERSION < <(
+        TOTAL_DURATION_MS API_DURATION_MS CC_VERSION \
+        EXCEEDS_200K VIM_MODE OUTPUT_STYLE AGENT_NAME \
+        WORKTREE_NAME WORKTREE_BRANCH PROJECT_DIR < <(
     echo "$input" | jq -r '[
         .workspace.current_dir,
         (.cost.total_cost_usd // "0"),
@@ -117,7 +120,14 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
         (.cost.total_lines_removed // 0),
         (.cost.total_duration_ms // 0),
         (.cost.total_api_duration_ms // 0),
-        (.version // "__EMPTY__")
+        (.version // "__EMPTY__"),
+        (.exceeds_200k_tokens // false),
+        (.vim.mode // "__EMPTY__"),
+        (.output_style.name // "default"),
+        (.agent.name // "__EMPTY__"),
+        (.worktree.name // "__EMPTY__"),
+        (.worktree.branch // "__EMPTY__"),
+        (.workspace.project_dir // "__EMPTY__")
     ] | @tsv' 2>/dev/null
 )
 
@@ -127,6 +137,11 @@ IFS=$'\t' read -r DIR COST MODEL SESSION_ID TRANSCRIPT_PATH \
 [ "$USED_PCT_INPUT" = "__EMPTY__" ] && USED_PCT_INPUT=""
 [ "$REMAINING_PCT_INPUT" = "__EMPTY__" ] && REMAINING_PCT_INPUT=""
 [ "$CC_VERSION" = "__EMPTY__" ] && CC_VERSION=""
+[ "$VIM_MODE" = "__EMPTY__" ] && VIM_MODE=""
+[ "$AGENT_NAME" = "__EMPTY__" ] && AGENT_NAME=""
+[ "$WORKTREE_NAME" = "__EMPTY__" ] && WORKTREE_NAME=""
+[ "$WORKTREE_BRANCH" = "__EMPTY__" ] && WORKTREE_BRANCH=""
+[ "$PROJECT_DIR" = "__EMPTY__" ] && PROJECT_DIR=""
 
 # Validate and sanitize extracted values
 DIR=$(validate_directory "$DIR")
