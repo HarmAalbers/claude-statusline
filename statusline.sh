@@ -608,6 +608,14 @@ if [ -n "$AGENT_NAME" ]; then
     AGENT_INDICATOR=" \033[1;33m🤖${AGENT_NAME}\033[0m"
 fi
 
+# Navigation indicator: show project dir when current dir diverges
+# Hidden when agent or worktree is active to prevent LINE1 overflow
+NAV_INDICATOR=""
+if [ -n "$PROJECT_DIR" ] && [ "$DIR" != "$PROJECT_DIR" ] && [ -z "$AGENT_NAME" ] && [ -z "$WORKTREE_NAME" ]; then
+    PROJECT_DISPLAY="${PROJECT_DIR/#$HOME/~}"
+    NAV_INDICATOR=" \033[0;90m(from ${PROJECT_DISPLAY})\033[0m"
+fi
+
 # Detect language/environment based on project files
 # Priority: .python-version > pyproject.toml/requirements.txt > package.json > go.mod
 # Shows version numbers for each detected language/runtime
@@ -793,7 +801,7 @@ if [ -n "$CC_VERSION" ]; then
     VERSION_DISPLAY=" \033[0;90mv${CC_VERSION}\033[0m"
 fi
 
-LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VIM_INDICATOR}${AGENT_INDICATOR}${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}${STYLE_INDICATOR}"
+LINE1="📁 ${DIR_DISPLAY}${NAV_INDICATOR}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VIM_INDICATOR}${AGENT_INDICATOR}${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}${STYLE_INDICATOR}"
 # Worktree indicator (shown before branch on git line)
 WORKTREE_INDICATOR=""
 if [ -n "$WORKTREE_NAME" ]; then
