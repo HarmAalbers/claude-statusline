@@ -586,6 +586,16 @@ if [ "$THINKING" = "true" ]; then
     THINKING_INDICATOR=" 🧠"
 fi
 
+# Vim mode indicator
+VIM_INDICATOR=""
+if [ -n "$VIM_MODE" ]; then
+    case "$VIM_MODE" in
+        NORMAL)  VIM_INDICATOR=" \033[1;34m[N]\033[0m" ;;  # Blue
+        INSERT)  VIM_INDICATOR=" \033[1;32m[I]\033[0m" ;;  # Green
+        *)       VIM_INDICATOR=" \033[0;90m[${VIM_MODE:0:1}]\033[0m" ;;  # Dim for unknown
+    esac
+fi
+
 # Detect language/environment based on project files
 # Priority: .python-version > pyproject.toml/requirements.txt > package.json > go.mod
 # Shows version numbers for each detected language/runtime
@@ -771,7 +781,7 @@ if [ -n "$CC_VERSION" ]; then
     VERSION_DISPLAY=" \033[0;90mv${CC_VERSION}\033[0m"
 fi
 
-LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}"
+LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VIM_INDICATOR}${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}"
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
 LINE3="⚡️ ${PROGRESS_BAR}${CONTEXT_SIZE_LABEL}${CACHE_DISPLAY}${API_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
