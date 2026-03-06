@@ -208,6 +208,13 @@ case "$MODEL_ID" in
         ;;
 esac
 
+# Apply long-context pricing multipliers when exceeds 200K tokens
+# Anthropic applies this as a step function: all tokens at higher rate
+if [ "$EXCEEDS_200K" = "true" ]; then
+    INPUT_PRICE=$(awk "BEGIN {printf \"%.2f\", $INPUT_PRICE * 2}")
+    OUTPUT_PRICE=$(awk "BEGIN {printf \"%.2f\", $OUTPUT_PRICE * 1.5}")
+fi
+
 # Calculate costs: (tokens / 1 million) * price_per_million
 # Using validated numeric inputs to prevent injection
 INPUT_COST=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT / 1000000.0 * $INPUT_PRICE)}")
@@ -712,6 +719,19 @@ for ((i=0; i<EMPTY; i++)); do
 done
 PROGRESS_BAR="${PROGRESS_BAR}\033[0m ${CONTEXT_PCT}%"
 
+# Context size label for large context windows (e.g., "1M" for 1000000)
+CONTEXT_SIZE_LABEL=""
+if [ "$CONTEXT_SIZE" -gt 200000 ]; then
+    CTX_LABEL=$(awk "BEGIN {printf \"%.0fK\", $CONTEXT_SIZE / 1000}")
+    # Use "1M" instead of "1000K" for readability
+    [ "$CTX_LABEL" = "1000K" ] && CTX_LABEL="1M"
+    if [ "$EXCEEDS_200K" = "true" ]; then
+        CONTEXT_SIZE_LABEL=" \033[1;31m${CTX_LABEL}\033[0m"  # Red - long-context pricing active
+    else
+        CONTEXT_SIZE_LABEL=" \033[0;90m${CTX_LABEL}\033[0m"  # Dim - large window, not yet exceeded
+    fi
+fi
+
 # Build session info (ID + optional human-readable slug)
 # Note: OSC 8 ANSI hyperlinks were removed as the BEL character (\a)
 # causes Claude Code's statusline parser to exit abnormally
@@ -753,7 +773,7 @@ fi
 
 LINE1="📁 ${DIR_DISPLAY}${LANG_VERSION}${VENV_INFO} │ \033[0;35m[${MODEL_SHORT}]${THINKING_INDICATOR}\033[0m${VERSION_DISPLAY} │ ${ACCOUNT_TYPE}"
 LINE2="🌿 \033[1;36m${BRANCH}\033[0m${GITHUB_LINK}${GIT_STATUS}${SIZE_LABEL}"
-LINE3="⚡️ ${PROGRESS_BAR}${CACHE_DISPLAY}${API_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
+LINE3="⚡️ ${PROGRESS_BAR}${CONTEXT_SIZE_LABEL}${CACHE_DISPLAY}${API_DISPLAY} │ ${SESSION_INFO}${LINES_DISPLAY} │ 💰 \$${COST} (\033[1;32m↓\$${INPUT_COST}\033[0m/\033[1;33m↑\$${OUTPUT_COST}\033[0m) │ 📊 \$${DAILY_COST}/day │ 🔥 \$${HOURLY_RATE}/hr │ ⏱️  ${SESSION_TIME} │ 🕐 ${CURRENT_TIME}"
 
 printf '%b\n' "$LINE1"
 printf '%b\n' "$LINE2"
